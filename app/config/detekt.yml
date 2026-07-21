@@ -1,0 +1,57 @@
+# ──────────────────────────────────────────────────────────────────────────
+# Ascent — Detekt configuration
+#
+# This file only lists the rules we want to CHANGE from Detekt's defaults
+# (because build.gradle has `buildUponDefaultConfig = true`). Everything not
+# mentioned here keeps its normal default behavior.
+#
+# The goal: silence the findings that are just noise for a single-file Jetpack
+# Compose app (magic numbers, wildcard imports, "this function/file is big"),
+# while KEEPING the rules that catch genuinely useful things (unused code,
+# empty blocks, real bug patterns, naming).
+# ──────────────────────────────────────────────────────────────────────────
+
+complexity:
+  # A Compose UI is naturally built from a few very large @Composable functions.
+  # These rules just restate that the app is one big file — a known, structural
+  # thing — so we turn them off rather than see them repeated.
+  LongMethod:
+    active: false
+  LongParameterList:
+    active: false
+  CyclomaticComplexMethod:
+    active: false
+  CognitiveComplexMethod:
+    active: false
+  TooManyFunctions:
+    active: false
+  LargeClass:
+    active: false
+  NestedBlockDepth:
+    active: false
+
+style:
+  # Every dp/sp value, color hex, and animation duration in Compose is a literal
+  # number, so this rule fires hundreds of times with no real signal. Off.
+  MagicNumber:
+    active: false
+  # The app intentionally uses wildcard imports (e.g. material3.*, runtime.*),
+  # which is normal and readable for Compose. Off.
+  WildcardImport:
+    active: false
+  # Long string templates and a few long lines are fine here.
+  MaxLineLength:
+    active: false
+  # Keep the genuinely useful style rules ON (these are NOT disabled):
+  #   UnusedPrivateMember, UnusedImports, EmptyFunctionBlock, etc. stay active
+  #   by default — they catch real leftover/dead code worth cleaning up.
+
+exceptions:
+  # The 3 broad catches in the backup/restore code are intentional, reviewed
+  # safety nets: if a file can't be read/parsed we deliberately fall back to a
+  # friendly message instead of crashing. These two rules flag that pattern, so
+  # we turn them off after confirming the catches are correct.
+  TooGenericExceptionCaught:
+    active: false
+  SwallowedException:
+    active: false
