@@ -5469,16 +5469,16 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                                                 imageVector = Icons.Filled.CheckCircle,
                                                                                                 contentDescription = "Mark subtask incomplete",
                                                                                                 tint = SuccessGreen,
-                                                                                                modifier = Modifier.size(18.dp).clickable {
+                                                                                                modifier = Modifier.size(26.dp).clickable {
                                                                                                     updateSubtasks { list -> list.map { if (it.id == st.id) it.copy(isCompleted = false) else it } }
                                                                                                 }
                                                                                             )
                                                                                         } else {
                                                                                             Box(
                                                                                                 modifier = Modifier
-                                                                                                    .size(18.dp)
+                                                                                                    .size(26.dp)
                                                                                                     .clip(CircleShape)
-                                                                                                    .border(1.5.dp, MidnightSlate.copy(alpha = 0.35f), CircleShape)
+                                                                                                    .border(2.dp, MidnightSlate.copy(alpha = 0.35f), CircleShape)
                                                                                                     .clickable {
                                                                                                         updateSubtasks { list -> list.map { if (it.id == st.id) it.copy(isCompleted = true) else it } }
                                                                                                         // If this was the last unchecked subtask, offer to complete the parent.
@@ -5487,7 +5487,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                                                     }
                                                                                             )
                                                                                         }
-                                                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                                                        Spacer(modifier = Modifier.width(10.dp))
                                                                                         Text(
                                                                                             text = st.text,
                                                                                             style = MaterialTheme.typography.bodyLarge,
