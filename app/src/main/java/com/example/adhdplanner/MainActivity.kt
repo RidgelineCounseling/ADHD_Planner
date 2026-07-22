@@ -10,6 +10,7 @@ import androidx.lifecycle.LifecycleOwner
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -7242,10 +7243,13 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
         // state and launches the matching flow. Uses a full-screen Dialog with translucent scrim
         // and a vertically-stacked column of pill buttons positioned above where the FAB sits.
         if (showAddSheet) {
-            Dialog(
-                onDismissRequest = { showAddSheet = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = true, dismissOnBackPress = true)
-            ) {
+            // Rendered inline as a full-screen overlay rather than inside a Dialog window.
+            // A Dialog(usePlatformDefaultWidth = false) whose root was a fillMaxSize scrim
+            // failed to lay out on some devices — the window measured to zero, so nothing
+            // appeared and the menu could not be dismissed (there was no way to flip
+            // showAddSheet back to false). Inline, it measures against real screen
+            // constraints and always draws. Back, the scrim, or the FAB all close it.
+            BackHandler { showAddSheet = false }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -7346,28 +7350,12 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                             showGoalWizardDialog = true
                         }
 
-                        // Visual replacement of the FAB: same icon (Add) rotated 45° so it reads
-                        // as ×. Sits exactly where the FAB visually was, with the same color and
-                        // shape, so the dialog overlay looks like the FAB itself rotated rather
-                        // than a separate button. Tapping dismisses the chooser (the icon then
-                        // rotates back to + as the FAB reappears underneath).
-                        Button(
-                            onClick = { showAddSheet = false },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(0.dp),
-                            modifier = Modifier.size(54.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Add,
-                                contentDescription = "Close menu",
-                                tint = PureWhite,
-                                modifier = Modifier.size(28.dp).rotate(fabIconRotation)
-                            )
-                        }
+                        // The real Scaffold FAB sits directly over this spot showing the "×"
+                        // (its "+" rotated 45°) and closes the menu when tapped; this spacer
+                        // reserves the same footprint so the pill stack lines up above it.
+                        Spacer(modifier = Modifier.size(54.dp))
                     }
                 }
-            }
         }
 
         // Quick "add to-do" dialog launched from the FAB chooser. Adds a single OtherTodoItem to
