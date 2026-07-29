@@ -58,8 +58,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CardGiftcard
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
@@ -3058,7 +3060,7 @@ fun CondensedPrioritiesCard(
                                     modifier = Modifier.weight(1f)
                                 )
                                 if (isDone) {
-                                    Text("✓", color = PureWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Icon(imageVector = Icons.Outlined.Check, contentDescription = null, tint = PureWhite, modifier = Modifier.size(16.dp))
                                 }
                             }
                         }
@@ -4891,7 +4893,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Text("✨", fontSize = 18.sp)
+                                        Icon(imageVector = Icons.Outlined.AutoAwesome, contentDescription = null, tint = RidgelineBlue, modifier = Modifier.size(20.dp))
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = "Refresh your reward bank?",
@@ -5713,7 +5715,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                     color = PureWhite.copy(alpha = 0.85f)
                                                                 )
                                                             } else if (isDone) {
-                                                                Text("✓", color = PureWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                                                Icon(imageVector = Icons.Outlined.Check, contentDescription = null, tint = PureWhite, modifier = Modifier.size(16.dp))
                                                             }
                                                         }
                                                     }
@@ -6124,7 +6126,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                     color = PureWhite.copy(alpha = 0.85f)
                                                                 )
                                                             } else if (isDone) {
-                                                                Text("✓", color = PureWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                                                Icon(imageVector = Icons.Outlined.Check, contentDescription = null, tint = PureWhite, modifier = Modifier.size(16.dp))
                                                             }
                                                         }
                                                     }
@@ -9826,7 +9828,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                 ) {
                                     Text(option, style = MaterialTheme.typography.bodyMedium, color = MidnightSlate, modifier = Modifier.weight(1f))
                                     if (answered != null && isQuiz && idx == note.correctOption) {
-                                        Text("✓", color = SuccessGreen, fontWeight = FontWeight.Bold)
+                                        Icon(imageVector = Icons.Outlined.Check, contentDescription = "Correct answer", tint = SuccessGreen, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
