@@ -5901,6 +5901,37 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                             }
                                                                         }
 
+                                                                        // Inline add-a-step input — mirrors the Lists "add a subtask" row so
+                                                                        // Goals and Lists feel the same. Appends a new step to this goal.
+                                                                        var stepDraft by remember(goal.id) { mutableStateOf("") }
+                                                                        Row(
+                                                                            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 8.dp),
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                                        ) {
+                                                                            OutlinedTextField(
+                                                                                value = stepDraft, onValueChange = { stepDraft = it },
+                                                                                placeholder = { Text("Add a step…") }, singleLine = true,
+                                                                                textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                                                                                modifier = Modifier.weight(1f),
+                                                                                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = CardInset, unfocusedContainerColor = CardInset, focusedBorderColor = RidgelineBlue, unfocusedBorderColor = Color.Transparent),
+                                                                                shape = RoundedCornerShape(50)
+                                                                            )
+                                                                            Box(
+                                                                                modifier = Modifier.size(36.dp).clip(CircleShape).background(RidgelineBlue).clickable {
+                                                                                    val t = stepDraft.trim()
+                                                                                    if (t.isNotBlank()) {
+                                                                                        val gIdx = goalEntries.indexOfFirst { it.id == goal.id }
+                                                                                        if (gIdx != -1) {
+                                                                                            goalEntries[gIdx] = goalEntries[gIdx].copy(steps = goalEntries[gIdx].steps + GoalStep(text = t))
+                                                                                            stepDraft = ""
+                                                                                            recordActivity()
+                                                                                        }
+                                                                                    }
+                                                                                }, contentAlignment = Alignment.Center
+                                                                            ) { Icon(imageVector = Icons.Outlined.Add, contentDescription = "Add step", tint = PureWhite, modifier = Modifier.size(18.dp)) }
+                                                                        }
+
                                                                         if (goal.reward.isNotBlank()) {
                                                                             Spacer(modifier = Modifier.height(10.dp))
                                                                             val totalSteps = goal.steps.size
@@ -5923,39 +5954,56 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                                 }
                                                                             }
                                                                         } else {
+                                                                            // No reward yet. Show a calm prompt button beneath the add-step
+                                                                            // input; tapping it reveals the predetermined reward chips plus a
+                                                                            // text box styled exactly like the step/subtask input.
+                                                                            var showRewardEditor by remember(goal.id) { mutableStateOf(false) }
                                                                             var inlineRewardText by remember(goal.id) { mutableStateOf("") }
-                                                                            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                                                RewardChipsRow(
-                                                                                    bank = rewardBank,
-                                                                                    mediumOnly = true,
-                                                                                    onPick = { inlineRewardText = it }
-                                                                                )
-                                                                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                                                                    OutlinedTextField(
-                                                                                        value = inlineRewardText,
-                                                                                        onValueChange = { inlineRewardText = it },
-                                                                                        placeholder = { Text("Set a reward for this goal...") },
-                                                                                        singleLine = true,
-                                                                                        modifier = Modifier.weight(1f).height(48.dp),
-                                                                                        colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = PureWhite, unfocusedContainerColor = PureWhite, focusedBorderColor = RidgelineBlue, unfocusedBorderColor = Color.Transparent),
-                                                                                        shape = RoundedCornerShape(50)
+                                                                            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, start = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                                                if (!showRewardEditor) {
+                                                                                    Row(
+                                                                                        modifier = Modifier
+                                                                                            .clip(RoundedCornerShape(50))
+                                                                                            .background(NeutralFill)
+                                                                                            .clickable { showRewardEditor = true }
+                                                                                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                                                    ) {
+                                                                                        Text("🎁", style = MaterialTheme.typography.bodyLarge)
+                                                                                        Text("Set a reward", style = MaterialTheme.typography.bodyLarge, color = MidnightSlate)
+                                                                                    }
+                                                                                } else {
+                                                                                    RewardChipsRow(
+                                                                                        bank = rewardBank,
+                                                                                        mediumOnly = true,
+                                                                                        onPick = { inlineRewardText = it }
                                                                                     )
-                                                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                                                    Button(
-                                                                                        onClick = {
-                                                                                            if (inlineRewardText.isNotBlank()) {
-                                                                                                val gIdx = goalEntries.indexOfFirst { it.id == goal.id }
-                                                                                                if (gIdx != -1) {
-                                                                                                    goalEntries[gIdx] = goalEntries[gIdx].copy(reward = inlineRewardText.trim())
-                                                                                                    recordActivity()
-                                                                                                    showNotification("Reward Saved!", "Keep up the momentum!", RidgelineBlue, "🎁")
+                                                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                                                        OutlinedTextField(
+                                                                                            value = inlineRewardText,
+                                                                                            onValueChange = { inlineRewardText = it },
+                                                                                            placeholder = { Text("Set a reward…") },
+                                                                                            singleLine = true,
+                                                                                            textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                                                                                            modifier = Modifier.weight(1f),
+                                                                                            colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = CardInset, unfocusedContainerColor = CardInset, focusedBorderColor = RidgelineBlue, unfocusedBorderColor = Color.Transparent),
+                                                                                            shape = RoundedCornerShape(50)
+                                                                                        )
+                                                                                        Box(
+                                                                                            modifier = Modifier.size(36.dp).clip(CircleShape).background(RidgelineBlue).clickable {
+                                                                                                val t = inlineRewardText.trim()
+                                                                                                if (t.isNotBlank()) {
+                                                                                                    val gIdx = goalEntries.indexOfFirst { it.id == goal.id }
+                                                                                                    if (gIdx != -1) {
+                                                                                                        goalEntries[gIdx] = goalEntries[gIdx].copy(reward = t)
+                                                                                                        recordActivity()
+                                                                                                        showNotification("Reward Saved!", "Keep up the momentum!", RidgelineBlue, "🎁")
+                                                                                                    }
                                                                                                 }
-                                                                                            }
-                                                                                        },
-                                                                                        colors = ButtonDefaults.buttonColors(containerColor = RidgelineBlue),
-                                                                                        shape = RoundedCornerShape(50),
-                                                                                        modifier = Modifier.height(48.dp)
-                                                                                    ) { Text("Save") }
+                                                                                            }, contentAlignment = Alignment.Center
+                                                                                        ) { Icon(imageVector = Icons.Outlined.Add, contentDescription = "Save reward", tint = PureWhite, modifier = Modifier.size(18.dp)) }
+                                                                                    }
                                                                                 }
                                                                             }
                                                                         }
@@ -6259,6 +6307,37 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                             }
                                                                         }
 
+                                                                        // Inline add-a-step input — mirrors the Lists "add a subtask" row so
+                                                                        // Goals and Lists feel the same. Appends a new step to this goal.
+                                                                        var stepDraft by remember(goal.id) { mutableStateOf("") }
+                                                                        Row(
+                                                                            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 8.dp),
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                                        ) {
+                                                                            OutlinedTextField(
+                                                                                value = stepDraft, onValueChange = { stepDraft = it },
+                                                                                placeholder = { Text("Add a step…") }, singleLine = true,
+                                                                                textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                                                                                modifier = Modifier.weight(1f),
+                                                                                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = CardInset, unfocusedContainerColor = CardInset, focusedBorderColor = RidgelineBlue, unfocusedBorderColor = Color.Transparent),
+                                                                                shape = RoundedCornerShape(50)
+                                                                            )
+                                                                            Box(
+                                                                                modifier = Modifier.size(36.dp).clip(CircleShape).background(RidgelineBlue).clickable {
+                                                                                    val t = stepDraft.trim()
+                                                                                    if (t.isNotBlank()) {
+                                                                                        val gIdx = goalEntries.indexOfFirst { it.id == goal.id }
+                                                                                        if (gIdx != -1) {
+                                                                                            goalEntries[gIdx] = goalEntries[gIdx].copy(steps = goalEntries[gIdx].steps + GoalStep(text = t))
+                                                                                            stepDraft = ""
+                                                                                            recordActivity()
+                                                                                        }
+                                                                                    }
+                                                                                }, contentAlignment = Alignment.Center
+                                                                            ) { Icon(imageVector = Icons.Outlined.Add, contentDescription = "Add step", tint = PureWhite, modifier = Modifier.size(18.dp)) }
+                                                                        }
+
                                                                         if (goal.reward.isNotBlank()) {
                                                                             Spacer(modifier = Modifier.height(10.dp))
                                                                             val totalSteps = goal.steps.size
@@ -6281,39 +6360,56 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                                 }
                                                                             }
                                                                         } else {
+                                                                            // No reward yet. Show a calm prompt button beneath the add-step
+                                                                            // input; tapping it reveals the predetermined reward chips plus a
+                                                                            // text box styled exactly like the step/subtask input.
+                                                                            var showRewardEditor by remember(goal.id) { mutableStateOf(false) }
                                                                             var inlineRewardText by remember(goal.id) { mutableStateOf("") }
-                                                                            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                                                RewardChipsRow(
-                                                                                    bank = rewardBank,
-                                                                                    mediumOnly = true,
-                                                                                    onPick = { inlineRewardText = it }
-                                                                                )
-                                                                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                                                                    OutlinedTextField(
-                                                                                        value = inlineRewardText,
-                                                                                        onValueChange = { inlineRewardText = it },
-                                                                                        placeholder = { Text("Set a reward for this goal...") },
-                                                                                        singleLine = true,
-                                                                                        modifier = Modifier.weight(1f).height(48.dp),
-                                                                                        colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = PureWhite, unfocusedContainerColor = PureWhite, focusedBorderColor = RidgelineBlue, unfocusedBorderColor = Color.Transparent),
-                                                                                        shape = RoundedCornerShape(50)
+                                                                            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, start = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                                                if (!showRewardEditor) {
+                                                                                    Row(
+                                                                                        modifier = Modifier
+                                                                                            .clip(RoundedCornerShape(50))
+                                                                                            .background(NeutralFill)
+                                                                                            .clickable { showRewardEditor = true }
+                                                                                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                                                    ) {
+                                                                                        Text("🎁", style = MaterialTheme.typography.bodyLarge)
+                                                                                        Text("Set a reward", style = MaterialTheme.typography.bodyLarge, color = MidnightSlate)
+                                                                                    }
+                                                                                } else {
+                                                                                    RewardChipsRow(
+                                                                                        bank = rewardBank,
+                                                                                        mediumOnly = true,
+                                                                                        onPick = { inlineRewardText = it }
                                                                                     )
-                                                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                                                    Button(
-                                                                                        onClick = {
-                                                                                            if (inlineRewardText.isNotBlank()) {
-                                                                                                val gIdx = goalEntries.indexOfFirst { it.id == goal.id }
-                                                                                                if (gIdx != -1) {
-                                                                                                    goalEntries[gIdx] = goalEntries[gIdx].copy(reward = inlineRewardText.trim())
-                                                                                                    recordActivity()
-                                                                                                    showNotification("Reward Saved!", "Keep up the momentum!", RidgelineBlue, "🎁")
+                                                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                                                        OutlinedTextField(
+                                                                                            value = inlineRewardText,
+                                                                                            onValueChange = { inlineRewardText = it },
+                                                                                            placeholder = { Text("Set a reward…") },
+                                                                                            singleLine = true,
+                                                                                            textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                                                                                            modifier = Modifier.weight(1f),
+                                                                                            colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = CardInset, unfocusedContainerColor = CardInset, focusedBorderColor = RidgelineBlue, unfocusedBorderColor = Color.Transparent),
+                                                                                            shape = RoundedCornerShape(50)
+                                                                                        )
+                                                                                        Box(
+                                                                                            modifier = Modifier.size(36.dp).clip(CircleShape).background(RidgelineBlue).clickable {
+                                                                                                val t = inlineRewardText.trim()
+                                                                                                if (t.isNotBlank()) {
+                                                                                                    val gIdx = goalEntries.indexOfFirst { it.id == goal.id }
+                                                                                                    if (gIdx != -1) {
+                                                                                                        goalEntries[gIdx] = goalEntries[gIdx].copy(reward = t)
+                                                                                                        recordActivity()
+                                                                                                        showNotification("Reward Saved!", "Keep up the momentum!", RidgelineBlue, "🎁")
+                                                                                                    }
                                                                                                 }
-                                                                                            }
-                                                                                        },
-                                                                                        colors = ButtonDefaults.buttonColors(containerColor = RidgelineBlue),
-                                                                                        shape = RoundedCornerShape(50),
-                                                                                        modifier = Modifier.height(48.dp)
-                                                                                    ) { Text("Save") }
+                                                                                            }, contentAlignment = Alignment.Center
+                                                                                        ) { Icon(imageVector = Icons.Outlined.Add, contentDescription = "Save reward", tint = PureWhite, modifier = Modifier.size(18.dp)) }
+                                                                                    }
                                                                                 }
                                                                             }
                                                                         }
