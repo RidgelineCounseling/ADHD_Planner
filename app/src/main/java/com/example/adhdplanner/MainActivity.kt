@@ -59,6 +59,7 @@ import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
@@ -5970,7 +5971,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                                         verticalAlignment = Alignment.CenterVertically,
                                                                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                                                     ) {
-                                                                                        Text("🎁", style = MaterialTheme.typography.bodyLarge)
+                                                                                        Icon(imageVector = Icons.Outlined.CardGiftcard, contentDescription = null, tint = RidgelineBlue, modifier = Modifier.size(18.dp))
                                                                                         Text("Set a reward", style = MaterialTheme.typography.bodyLarge, color = MidnightSlate)
                                                                                     }
                                                                                 } else {
@@ -6376,7 +6377,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                                                         verticalAlignment = Alignment.CenterVertically,
                                                                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                                                     ) {
-                                                                                        Text("🎁", style = MaterialTheme.typography.bodyLarge)
+                                                                                        Icon(imageVector = Icons.Outlined.CardGiftcard, contentDescription = null, tint = RidgelineBlue, modifier = Modifier.size(18.dp))
                                                                                         Text("Set a reward", style = MaterialTheme.typography.bodyLarge, color = MidnightSlate)
                                                                                     }
                                                                                 } else {
