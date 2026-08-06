@@ -2176,6 +2176,13 @@ fun formatTimeLabel(hour: Int, minute: Int): String {
     return String.format(Locale.US, "%d:%02d %s", h12, minute, amPm)
 }
 
+// Compact on-the-hour label for the timeline gutter, e.g. "12 PM", "1 PM" — no ":00".
+fun formatHourLabel(hour: Int): String {
+    val amPm = if (hour < 12) "AM" else "PM"
+    val h12 = if (hour == 0 || hour == 12) 12 else if (hour > 12) hour - 12 else hour
+    return "$h12 $amPm"
+}
+
 // ===== Device calendar (read-only) =====
 // Reads events the user already has synced on their phone (Google, Outlook, etc.) via Android's
 // CalendarContract content provider. No Google API, no backend, no account — just the
@@ -3734,7 +3741,6 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
 
     // Each top card is condensed by default and expands only on an explicit tap. Scrolling to
     // later times auto-condenses both; scrolling to earlier times no longer expands them.
-    var priorityExpanded by remember { mutableStateOf(false) }
     var scoreboardExpanded by remember { mutableStateOf(false) }
     var accumulatedDelta by remember { mutableStateOf(0f) }
     var horizontalSwipeAccumulator by remember { mutableStateOf(0f) }
@@ -3765,7 +3771,6 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
             val delta = (newPos - prev).toFloat() // positive when scrolling toward later time
             accumulatedDelta = (accumulatedDelta + delta).coerceAtLeast(0f)
             if (accumulatedDelta >= condenseDistancePx) {
-                if (priorityExpanded) priorityExpanded = false
                 if (scoreboardExpanded) scoreboardExpanded = false
                 accumulatedDelta = 0f
             }
@@ -4049,11 +4054,9 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
         ) {
             when (currentScreen) {
                 "Home" -> {
-                    // Minute ticker — drives a recomposition every 60 seconds so the Right Now
-                    // card recomputes which item is "in progress" vs "next up". Without this,
-                    // pickRightNowItem only re-runs when its inputs change, so a stale value of
-                    // LocalDateTime.now() can leave the card showing "next up · 2:30 PM" long after
-                    // 2:30 has passed. The ticker increments a counter we feed into remember(...).
+                    // Minute ticker — drives a recomposition every 60 seconds so the live "now"
+                    // line on the timeline keeps advancing without needing user interaction. The
+                    // ticker increments a counter that the now-line reads (see run { minuteTick }).
                     var minuteTick by remember { mutableStateOf(0) }
                     LaunchedEffect(Unit) {
                         while (true) {
@@ -4064,6 +4067,14 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                             kotlinx.coroutines.delay(secondsUntilNextMinute * 1000L)
                             minuteTick++
                         }
+                    }
+                    // The week-day strip was removed from this screen, but the shared pagerState
+                    // still backs the Lists week strip and the "Today" button's currentPage check.
+                    // Keep it in sync with selectedDate so switching to Lists lands on the right week.
+                    LaunchedEffect(selectedDate) {
+                        val mon = selectedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                        val page = 5000 + ChronoUnit.WEEKS.between(baseMondayAnchor, mon).toInt()
+                        if (pagerState.currentPage != page) pagerState.scrollToPage(page)
                     }
                     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 4.dp)) {
                         AnimatedVisibility(visible = isWizardPlacementMode) {
@@ -4152,145 +4163,6 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                             }
                         }
 
-                        // "Right Now" card: surfaces the next priority or to-do so the user doesn't
-                        // have to scan the day to decide what to do. Compact, single-row layout —
-                        // stays present even while scrolling the schedule (the card itself doesn't
-                        // condense; only the scoreboard below does). Hidden in wizard mode only.
-                        if (!isWizardPlacementMode) {
-                            val rightNow = remember(scheduleEntries.toList(), otherTodoEntries.toList(), minuteTick) {
-                                pickRightNowItem(scheduleEntries, otherTodoEntries)
-                            }
-                            // The date the surfaced item lives on — used to sync Lists when tapped.
-                            val today = LocalDate.now()
-                            val rightNowDate: LocalDate? = when (rightNow) {
-                                is RightNowItem.Priority -> rightNow.entry.date
-                                is RightNowItem.Event -> rightNow.entry.date
-                                // A carried-over to-do has a past date but appears in today's
-                                // carried-over section — send the user to today, not the old date.
-                                is RightNowItem.Todo -> if (rightNow.todo.date.isBefore(today)) today else rightNow.todo.date
-                                is RightNowItem.AllClear -> null
-                            }
-                            // Compact sub-line that combines status + days-over for to-dos,
-                            // or status label for events. Empty if there's nothing to add.
-                            val subLine: String = when (rightNow) {
-                                is RightNowItem.Event -> rightNow.statusLabel
-                                is RightNowItem.Priority -> if (rightNow.entry.hasCustomTime) formatTimeLabel(rightNow.entry.startHour, rightNow.entry.startMinute) else ""
-                                is RightNowItem.Todo -> {
-                                    val daysOver = ChronoUnit.DAYS.between(rightNow.todo.date, today)
-                                    when {
-                                        daysOver <= 0L -> ""
-                                        daysOver == 1L -> "From yesterday"
-                                        else -> "From $daysOver days ago"
-                                    }
-                                }
-                                else -> ""
-                            }
-                            val eyebrow: String = when (rightNow) {
-                                is RightNowItem.Priority -> "TOP PRIORITY"
-                                is RightNowItem.Todo -> if (rightNow.todo.date.isBefore(today)) "CARRIED OVER" else "NEXT TO-DO"
-                                is RightNowItem.Event -> "ON YOUR SCHEDULE"
-                                is RightNowItem.AllClear -> "ALL CLEAR"
-                            }
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-                                shape = RoundedCornerShape(24.dp),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable { priorityExpanded = !priorityExpanded }
-                            ) {
-                                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = if (!priorityExpanded) 6.dp else 8.dp)) {
-                                    // Title row: an inline eyebrow pill in front of the task text,
-                                    // both on the same line. Saves the previous standalone eyebrow row.
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(50))
-                                                .background(PureWhite.copy(alpha = 0.18f))
-                                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = eyebrow,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = PureWhite
-                                            )
-                                        }
-                                        Text(
-                                            text = if (rightNow is RightNowItem.AllClear) "🎉 Deck cleared!" else rightNow.task,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = PureWhite,
-                                            maxLines = 1,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        // Chevron signals the card expands/condenses on tap.
-                                        if (rightNow !is RightNowItem.AllClear) {
-                                            Icon(
-                                                imageVector = if (priorityExpanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-                                                contentDescription = if (priorityExpanded) "Collapse" else "Expand",
-                                                tint = PureWhite.copy(alpha = 0.9f),
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                    }
-
-                                    // Expanded-only detail: the supplemental sub-row plus a button
-                                    // to open this item on the Lists page. Condensed by default —
-                                    // the eyebrow + task line above always shows so the card still
-                                    // tells you what's next at a glance.
-                                    if (rightNow !is RightNowItem.AllClear && priorityExpanded) {
-                                        // Supplemental sub-row, joined by middots — same as before.
-                                        val cue = when (rightNow) {
-                                            is RightNowItem.Priority -> rightNow.entry.triggerCue
-                                            is RightNowItem.Event -> rightNow.entry.triggerCue
-                                            is RightNowItem.Todo -> rightNow.todo.triggerCue
-                                            else -> ""
-                                        }
-                                        val pieces = buildList {
-                                            if (subLine.isNotBlank()) add(subLine)
-                                            if (rightNow.reward.isNotBlank()) add("🎁 ${rightNow.reward}")
-                                            if (cue.isNotBlank()) add("When I ${cue}…")
-                                        }
-                                        if (pieces.isNotEmpty()) {
-                                            Text(
-                                                text = pieces.joinToString("  ·  "),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = PureWhite.copy(alpha = 0.85f),
-                                                maxLines = 1,
-                                                modifier = Modifier.padding(start = 2.dp, top = 2.dp)
-                                            )
-                                        }
-                                        // "View in Lists" — jumps to the Lists page for this item's
-                                        // date. Its own clickable, so it navigates instead of just
-                                        // toggling the card.
-                                        if (rightNowDate != null) {
-                                            Spacer(modifier = Modifier.height(10.dp))
-                                            Row(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(50))
-                                                    .background(PureWhite.copy(alpha = 0.18f))
-                                                    .clickable {
-                                                        rightNowDate?.let { date ->
-                                                            selectedDate = date
-                                                            val targetMon = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                                                            val weeksDiff = ChronoUnit.WEEKS.between(baseMondayAnchor, targetMon).toInt()
-                                                            coroutineScope.launch { pagerState.animateScrollToPage(5000 + weeksDiff) }
-                                                            currentScreen = "Lists"
-                                                        }
-                                                    }
-                                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                Icon(imageVector = Icons.Outlined.Checklist, contentDescription = null, tint = PureWhite, modifier = Modifier.size(15.dp))
-                                                Text("View in Lists", style = MaterialTheme.typography.labelMedium, color = PureWhite, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                        }
 
                         ScoreboardSection(
                             elevation = elevation, todayCompletions = todayCompletions, activityDates = activityDates.toSet(),
@@ -4300,12 +4172,13 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Single row: tappable month label on the left, the week-day strip
-                        // flowing to its right inside a HorizontalPager. The 3-letter month
-                        // abbreviation keeps the left side width predictable across months.
-                        // The Today return button has moved next to the FAB (see below).
+                        // Compact date header: a single "Wed, Aug 6" button that opens the month
+                        // calendar. The week-day strip was removed to keep this screen calm and
+                        // agenda-like — swipe the timeline to move day-to-day, or tap here to jump.
                         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             val showYear = selectedDate.year != LocalDate.now().year
+                            val dowShort = selectedDate.dayOfWeek.getDisplayName(DateTimeTextStyle.SHORT, Locale.getDefault())
+                            val monthShort = selectedDate.month.getDisplayName(DateTimeTextStyle.SHORT, Locale.getDefault())
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
@@ -4317,7 +4190,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                     .padding(horizontal = 6.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = selectedDate.month.getDisplayName(DateTimeTextStyle.SHORT, Locale.getDefault()) + (if (showYear) " ${selectedDate.year}" else ""),
+                                    text = "$dowShort, $monthShort ${selectedDate.dayOfMonth}" + (if (showYear) ", ${selectedDate.year}" else ""),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MidnightSlate
                                 )
@@ -4328,6 +4201,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
+                            Spacer(modifier = Modifier.weight(1f))
                             // Manual calendar refresh — only shown when the device-calendar feature
                             // is active. Re-reads immediately for events added/changed in another app.
                             if (showDeviceCalendar && calendarPermissionGranted) {
@@ -4347,22 +4221,6 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                         tint = RidgelineBlue,
                                         modifier = Modifier.size(18.dp)
                                     )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(4.dp))
-                            // Week-day strip: HorizontalPager takes the remaining width.
-                            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-                                val weekMonday = baseMondayAnchor.plusWeeks((page - 5000).toLong())
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
-                                    for (dayOffset in 0..6) {
-                                        val iteratingDate = weekMonday.plusDays(dayOffset.toLong())
-                                        WeekStripDay(
-                                            date = iteratingDate,
-                                            isSelected = iteratingDate == selectedDate,
-                                            isToday = iteratingDate == LocalDate.now(),
-                                            onClick = { selectedDate = iteratingDate }
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -4467,7 +4325,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                 // External all-day events — read-only, calendar-icon chips.
                                 externalAllDay.forEach { ext ->
                                     Card(
-                                        colors = CardDefaults.cardColors(containerColor = MistBlue.copy(alpha = 0.3f)),
+                                        colors = CardDefaults.cardColors(containerColor = SkyMid.copy(alpha = 0.4f)),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                                         shape = RoundedCornerShape(50),
                                         modifier = Modifier.clickable { externalEventToInspect = ext }
@@ -4623,7 +4481,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                 },
                                                 verticalAlignment = Alignment.Top
                                             ) {
-                                                Text(text = formatTimeLabel(hour, 0), style = MaterialTheme.typography.labelMedium, color = MidnightSlate.copy(alpha = 0.5f), modifier = Modifier.width(65.dp).padding(top = 4.dp), textAlign = TextAlign.End)
+                                                Text(text = formatHourLabel(hour), style = MaterialTheme.typography.labelMedium, color = MidnightSlate.copy(alpha = 0.5f), modifier = Modifier.width(65.dp).padding(top = 4.dp), textAlign = TextAlign.End)
                                                 Box(modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 16.dp)) { HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f), thickness = 1.dp, modifier = Modifier.align(Alignment.TopStart)) }
                                             }
                                         }
@@ -4644,7 +4502,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                                     defaultSlotLabel = "",
                                                     task = ext.title,
                                                     isTopPriority = false,
-                                                    blockColor = MistBlue.copy(alpha = 0.35f),
+                                                    blockColor = SkyMid.copy(alpha = 0.4f),
                                                     startHour = zdt.hour,
                                                     startMinute = zdt.minute,
                                                     durationMins = dur,
@@ -4786,7 +4644,7 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
 
                                     if (targetDate == LocalDate.now()) {
                                         Box(modifier = Modifier.fillMaxSize().padding(start = 81.dp)) {
-                                            val timeNow = LocalTime.now()
+                                            val timeNow = run { minuteTick; LocalTime.now() }
                                             val totalMinsNow = timeNow.hour * 60 + timeNow.minute
                                             val liveYOffsetDp = totalMinsNow * minuteScaleFactor
                                             Row(modifier = Modifier.fillMaxWidth().offset(y = liveYOffsetDp.dp), verticalAlignment = Alignment.CenterVertically) {
