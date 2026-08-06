@@ -4172,27 +4172,36 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Compact date header: a single "Wed, Aug 6" button that opens the month
-                        // calendar. The week-day strip was removed to keep this screen calm and
-                        // agenda-like — swipe the timeline to move day-to-day, or tap here to jump.
+                        // Combined header row: a pill-shaped date button opens the month calendar,
+                        // with the day's all-day items and unscheduled priorities scrolling to its
+                        // right. Keeps the top of the schedule compact and agenda-like.
+                        val allDayForSelected = scheduleEntries.filter { it.date == selectedDate && it.isAllDay }
+                        val externalAllDay = externalEvents.filter { it.isAllDay }
+                        val todoAllDay = otherTodoEntries.filter { !it.isCompleted && it.dueDate == selectedDate && it.dueTime == null }
+                        val unscheduledPriorities = scheduleEntries.filter { it.date == selectedDate && !it.isAllDay && !it.hasCustomTime && it.isTopPriority }
                         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             val showYear = selectedDate.year != LocalDate.now().year
                             val dowShort = selectedDate.dayOfWeek.getDisplayName(DateTimeTextStyle.SHORT, Locale.getDefault())
                             val monthShort = selectedDate.month.getDisplayName(DateTimeTextStyle.SHORT, Locale.getDefault())
+                            // Pill-shaped date button.
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
+                                    .background(PureWhite)
+                                    .border(1.dp, BorderGray, RoundedCornerShape(50))
                                     .clickable {
                                         pickerMonthState = YearMonth.from(selectedDate)
                                         showMonthDropdown = !showMonthDropdown
                                     }
-                                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
                             ) {
                                 Text(
                                     text = "$dowShort, $monthShort ${selectedDate.dayOfMonth}" + (if (showYear) ", ${selectedDate.year}" else ""),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MidnightSlate
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MidnightSlate,
+                                    maxLines = 1
                                 )
                                 Icon(
                                     imageVector = Icons.Outlined.ArrowDropDown,
@@ -4201,67 +4210,14 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.weight(1f))
-                            // Manual calendar refresh — only shown when the device-calendar feature
-                            // is active. Re-reads immediately for events added/changed in another app.
-                            if (showDeviceCalendar && calendarPermissionGranted) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(CircleShape)
-                                        .clickable {
-                                            calendarRefreshKey++
-                                            Toast.makeText(context, "Calendar refreshed", Toast.LENGTH_SHORT).show()
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Refresh,
-                                        contentDescription = "Refresh calendar",
-                                        tint = RidgelineBlue,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Inline dropdown calendar — drops down below the row above when opened.
-                        AnimatedVisibility(visible = showMonthDropdown) {
-                            DropdownCalendar(
-                                monthState = pickerMonthState,
-                                selectedDate = selectedDate,
-                                onMonthChange = { pickerMonthState = it },
-                                onDayPick = { picked ->
-                                    selectedDate = picked
-                                    val targetMon = picked.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                                    val weeksDiff = ChronoUnit.WEEKS.between(baseMondayAnchor, targetMon).toInt()
-                                    coroutineScope.launch { pagerState.scrollToPage(5000 + weeksDiff) }
-                                    showMonthDropdown = false
-                                }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // All-Day events bar. Shows entries flagged isAllDay for the selected date
-                        // as small chips that tap to open the standard inspect dialog. Only renders
-                        // when at least one all-day item exists, to avoid wasted vertical space.
-                        val allDayForSelected = scheduleEntries.filter { it.date == selectedDate && it.isAllDay }
-                        val externalAllDay = externalEvents.filter { it.isAllDay }
-                        // To-dos due on this day with no specific time show as all-day chips.
-                        val todoAllDay = otherTodoEntries.filter { !it.isCompleted && it.dueDate == selectedDate && it.dueTime == null }
-                        // Priorities with no time yet — they matter today but aren't placed on the
-                        // timeline. Tapping one starts placement so it can be scheduled.
-                        val unscheduledPriorities = scheduleEntries.filter { it.date == selectedDate && !it.isAllDay && !it.hasCustomTime && it.isTopPriority }
-                        if (allDayForSelected.isNotEmpty() || externalAllDay.isNotEmpty() || todoAllDay.isNotEmpty() || unscheduledPriorities.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            // All-day items / unscheduled priorities, scrolling to the right of the pill.
                             Row(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 6.dp)
+                                    .weight(1f)
                                     .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 // Unscheduled priorities lead the bar — they're the day's headline items.
                                 // Tapping one drops into placement mode so it can get a time.
@@ -4373,7 +4329,46 @@ fun MainApp(openReflection: Boolean = false, onReflectionOpened: () -> Unit = {}
                                     }
                                 }
                             }
+                            // Manual calendar refresh — shown only when the device-calendar feature is active.
+                            if (showDeviceCalendar && calendarPermissionGranted) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            calendarRefreshKey++
+                                            Toast.makeText(context, "Calendar refreshed", Toast.LENGTH_SHORT).show()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = "Refresh calendar",
+                                        tint = RidgelineBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
+
+                        // Inline dropdown calendar — drops down below the row above when opened.
+                        AnimatedVisibility(visible = showMonthDropdown) {
+                            DropdownCalendar(
+                                monthState = pickerMonthState,
+                                selectedDate = selectedDate,
+                                onMonthChange = { pickerMonthState = it },
+                                onDayPick = { picked ->
+                                    selectedDate = picked
+                                    val targetMon = picked.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                                    val weeksDiff = ChronoUnit.WEEKS.between(baseMondayAnchor, targetMon).toInt()
+                                    coroutineScope.launch { pagerState.scrollToPage(5000 + weeksDiff) }
+                                    showMonthDropdown = false
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Box(
                             modifier = Modifier
